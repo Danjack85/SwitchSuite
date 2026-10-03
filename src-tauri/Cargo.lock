@@ -5448,6 +5448,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "iana-time-zone",
+ "open",
  "pbkdf2",
  "serde",
  "serde_json",
