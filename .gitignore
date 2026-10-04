@@ -33,3 +33,6 @@ nul
 __pycache__/
 .mimosa/
 src-tauri/sidecar/wbswitch/wbswitch.exe.bak
+
+# 侧车 onedir 构建产物暂存区（同步进安装包用，不进版本库）
+desktop/

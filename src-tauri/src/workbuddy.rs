@@ -445,6 +445,28 @@ pub async fn wb_sessions_sync_cloud(
     run(&app, &a, NETWORK_TIMEOUT_SECS).await
 }
 
+/// 同根源去重：某账号名下同一根源会话的多份副本只留内容最完整的一份。
+#[tauri::command]
+pub async fn wb_sessions_dedupe(
+    app: AppHandle,
+    uid: String,
+    clear_error: bool,
+    dry_run: bool,
+) -> Result<serde_json::Value, String> {
+    let mut a = args![
+        Arg::lit("sessions"),
+        Arg::lit("--dedupe"),
+        Arg::token(&uid, "账号 uid")?,
+    ];
+    if clear_error {
+        a.push(Arg::lit("--clear-error"));
+    }
+    if dry_run {
+        a.push(Arg::lit("--dry-run"));
+    }
+    run(&app, &a, NETWORK_TIMEOUT_SECS).await
+}
+
 /// 会话正文归档：查看 / 收录 / 还原。
 #[tauri::command]
 pub async fn wb_bodies(

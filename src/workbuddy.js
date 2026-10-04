@@ -193,7 +193,9 @@ function sessionsHtml() {
     .map(([uid, n]) => {
       const acc = (state?.accounts || []).find((a) => a.uid === uid);
       const name = acc ? acc.name : t("wb.unknownAccount");
-      return `<div class="wb-kv"><span class="k">${esc(name)}</span><span class="v">${n}</span></div>`;
+      return `<div class="wb-kv"><span class="k">${esc(name)}</span><span class="v">${n}
+        <button class="icon-btn" title="${esc(t("wb.dedupeHint"))}" aria-label="${esc(t("wb.dedupe"))}"
+          click="wbActions.dedupeSessions('${esc(uid)}')">${ic("clean", 14)}</button></span></div>`;
     })
     .join("");
 
@@ -590,6 +592,44 @@ export const wbActions = {
           t("wb.copyDetail", {
             copied: r.copied ?? 0, skipped: r.skipped_exists ?? 0,
             missing: r.missing_body ?? 0, failed: r.failed ?? 0,
+          }));
+        await refreshData();
+      },
+    });
+  },
+
+  /** 同根源去重：某账号名下重复副本只留内容最完整的一份。 */
+  async dedupeSessions(uid) {
+    // 去重要写客户端独占的会话数据库与云端映射 —— 运行中必然失败，先拦截
+    if (state?.running) {
+      toast(t("wb.needCloseClient"), "warn");
+      return;
+    }
+    const acc = (state?.accounts || []).find((x) => x.uid === uid);
+    const name = acc?.name || uid;
+
+    // 先演练拿组数，再让用户确认
+    const dry = await call("sessions", () =>
+      invoke("wb_sessions_dedupe", { uid, clearError: true, dryRun: true }));
+    if (!dry) return;
+    if (!dry.removed) {
+      toast(t("wb.dedupeNone"), "ok");
+      return;
+    }
+
+    openConfirmModal({
+      kind: "danger",
+      icon: "clean",
+      title: t("wb.dedupeTitle", { name }),
+      desc: esc(t("wb.dedupeBody", { groups: dry.groups ?? 0, n: dry.removed ?? 0 })),
+      yesLabel: t("wb.dedupe"),
+      onYes: async () => {
+        const r = await call("sessions", () =>
+          invoke("wb_sessions_dedupe", { uid, clearError: true, dryRun: false }));
+        if (!r) return;
+        toast(t("wb.dedupeDone"), "ok",
+          t("wb.dedupeDetail", {
+            removed: r.removed ?? 0, cleared: r.cleared_errors ?? 0,
           }));
         await refreshData();
       },
