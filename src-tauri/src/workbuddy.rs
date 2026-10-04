@@ -277,11 +277,20 @@ pub async fn run(
 
     let ok = value.get("ok").and_then(|v| v.as_bool()).unwrap_or(false);
     if !ok {
-        let msg = value
+        // 信封里的 error 有时是无信息量的兜底文案（如「命令未能完成」），
+        // 真实原因在 detail（引擎人类可读输出）。拼在一起让界面能直接看到原因。
+        let mut msg = value
             .get("error")
             .and_then(|v| v.as_str())
             .unwrap_or("命令执行失败")
             .to_string();
+        if let Some(d) = value.get("detail").and_then(|v| v.as_str()) {
+            let d = d.trim();
+            if !d.is_empty() {
+                msg.push_str("：");
+                msg.push_str(d.trim_start_matches("! ").trim());
+            }
+        }
         return Err(msg);
     }
     Ok(value.get("data").cloned().unwrap_or(serde_json::Value::Null))

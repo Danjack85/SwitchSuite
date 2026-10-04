@@ -269,6 +269,24 @@ function backupsHtml() {
 /** 登录流程面板（在页面内联显示，不用弹窗 —— 弹窗一旦被误关就断了流程）。 */
 function loginHtml() {
   if (!login) return "";
+
+  // 第一步：选版本。两个版本是不同产品的登录页（国内版微信/手机号，
+  // 国际版邮箱/SSO），点「添加账号」时不该替用户默认任何一个。
+  if (login.phase === "choose") {
+    return `
+    <div class="wb-card highlight">
+      <div class="wb-row-between">
+        <b>${esc(t("wb.addAccount"))}</b>
+        <button class="btn-ghost" click="wbActions.loginCancel()">${esc(t("common.cancel"))}</button>
+      </div>
+      <div class="wb-dim">${esc(t("wb.chooseEdition"))}</div>
+      <div class="wb-actions">
+        ${btn(t("wb.edCn"), "play", "wbActions.loginStart('cn')", { disabled: !!busy })}
+        ${btn(t("wb.edIntl"), "play", "wbActions.loginStart('intl')", { disabled: !!busy })}
+      </div>
+    </div>`;
+  }
+
   const step = login.phase === "waiting"
     ? t("wb.loginWaiting", { sec: login.elapsed ?? 0 })
     : login.phase === "error"
@@ -541,6 +559,11 @@ export const wbActions = {
 
   /** 会话复制：把某账号的会话复制一份给当前账号（原会话保留，真共享）。 */
   async copySessions(sourceUid) {
+    // 复制要写客户端独占的会话数据库与云端映射 —— 运行中必然失败，先拦截
+    if (state?.running) {
+      toast(t("wb.needCloseClient"), "warn");
+      return;
+    }
     const acc = (state?.accounts || []).find((x) => x.uid === sourceUid);
     const name = acc?.name || sourceUid;
 
@@ -625,10 +648,16 @@ export const wbActions = {
 
   // ---- 登录流程（分步：拿链接 → 轮询 → 完成）----
 
-  async loginStart() {
+  async loginStart(edition) {
+    if (!edition) {
+      // 没带版本 = 进入选择页（国内版与国际版是不同产品的登录页）
+      login = { phase: "choose", url: "", elapsed: 0 };
+      rerender();
+      return;
+    }
     login = { phase: "starting", url: "", elapsed: 0 };
     rerender();
-    const r = await call("login", () => invoke("wb_login_start", { edition: "cn" }));
+    const r = await call("login", () => invoke("wb_login_start", { edition }));
     if (!r) {
       login = null;
       rerender();
